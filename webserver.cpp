@@ -8,7 +8,8 @@ WebServer::WebServer()
     //root文件夹路径
     char server_path[200];
     getcwd(server_path, 200);
-    char root[6] = "/root";
+    //char root[6] = "/root";
+    char root[15] = "/resource_new";
     m_root = (char *)malloc(strlen(server_path) + strlen(root) + 1);
     strcpy(m_root, server_path);
     strcat(m_root, root);
@@ -139,7 +140,7 @@ void WebServer::eventListen()
     m_epollfd = epoll_create(5);
     assert(m_epollfd != -1);
 
-    utils.addfd(m_epollfd, m_listenfd, false, m_LISTENTrigmode);
+    utils.addfd(m_epollfd, m_listenfd, false, m_LISTENTrigmode);//添加读监听事件
     http_conn::m_epollfd = m_epollfd;
 
     ret = socketpair(PF_UNIX, SOCK_STREAM, 0, m_pipefd);

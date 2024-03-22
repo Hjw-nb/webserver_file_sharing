@@ -14,6 +14,8 @@ const char *error_404_form = "The requested file was not found on this server.\n
 const char *error_500_title = "Internal Error";
 const char *error_500_form = "There was an unusual problem serving the request file.\n";
 
+
+const char *file_save_path="./Update_File";
 locker m_lock;
 map<string, string> users;
 
@@ -144,6 +146,8 @@ void http_conn::init()
     m_url = 0;
     m_version = 0;
     m_content_length = 0;
+    m_content_type=0;
+    m_boundary=0;
     m_host = 0;
     m_start_line = 0;
     m_checked_idx = 0;
@@ -153,7 +157,8 @@ void http_conn::init()
     m_state = 0;
     timer_flag = 0;
     improv = 0;
-
+    m_json_response=0;
+    //json_response="0";
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
@@ -281,7 +286,7 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
         return BAD_REQUEST;
     //当url为/时，显示判断界面
     if (strlen(m_url) == 1)
-        strcat(m_url, "judge.html");
+        strcat(m_url, "index.html");
     m_check_state = CHECK_STATE_HEADER;
     return NO_REQUEST;
 }
@@ -319,6 +324,27 @@ http_conn::HTTP_CODE http_conn::parse_headers(char *text)
         text += strspn(text, " \t");
         m_host = text;
     }
+    else if (strncasecmp(text, "Content-Type:", 13) == 0){
+        text +=13;
+        text += strspn(text, " \t");
+        char* end =strchr(text,';');
+        if(end!=nullptr){
+            //return BAD_REQUEST;
+            *end='\0';
+            m_content_type=text;
+            // *end=';';
+            LOG_INFO("-----------------m_content_type:%s", m_content_type);
+
+            text=end+1;
+            text += strspn(text, " \t");
+            if(strncasecmp(text, "boundary=", 9) == 0){
+                text+=9;
+                m_boundary=text;
+                LOG_INFO("-----------------boundary:%s", m_boundary);
+
+            }
+        }
+    }
     else
     {
         LOG_INFO("oop!unknow header: %s", text);
@@ -326,18 +352,103 @@ http_conn::HTTP_CODE http_conn::parse_headers(char *text)
     return NO_REQUEST;
 }
 
+
+
+
+// 用于查找文件名的辅助函数  
+const char* http_conn::findFilename(const char *requestBody) {  
+    const char *filenameStart = "filename=\"";  
+    const char *filenameEnd = "\"";  
+    const char *pos = strstr(requestBody, filenameStart);  
+    if (!pos) return NULL;  
+    pos += strlen(filenameStart);  
+    const char *end = strchr(pos, '"');  
+    if (!end) return NULL;  
+    size_t filenameLength = end - pos;  
+    char *filename = (char *)malloc(filenameLength + 1);  
+    if (!filename) return NULL; // 内存分配失败  
+    strncpy(filename, pos, filenameLength);  
+    filename[filenameLength] = '\0';  
+    return filename;  
+}  
+  
+// 保存文件内容到指定路径的辅助函数  
+void http_conn::saveFileContent(const char *filePath, const char *contentStart, const char *contentEnd) {  
+    FILE *file = fopen(filePath, "wb"); // 以二进制模式写入文件  
+    if (!file) {  
+        LOG_INFO("----------------------------Failed to open the output file for writing\r\n");  
+        return;  
+    }  
+    size_t contentLength = contentEnd - contentStart;  
+    fwrite(contentStart, sizeof(char), contentLength, file); // 写入文件内容  
+    fclose(file); // 关闭文件  
+    LOG_INFO("-----------------------------File saved successfully to %s\n", filePath);  
+}  
+  
+// 处理上传的文件内容的函数  
+void http_conn::update_file_save(const char *requestBody) {  
+    const char *filename = findFilename(requestBody); // 提取文件名  
+    if (!filename) {  
+        LOG_INFO("Failed to find filename in the request body.\n");  
+        return;  
+    }  
+
+    // requestBody += strspn(requestBody, "Content-Type: text/plain");
+    const char *contentStart= strstr(requestBody, "\r\n\r\n")+4;//去除两个换行符组合
+    LOG_INFO("-----------------contentStart:%s", contentStart);
+  
+    // const char *contentStart = requestBody;  
+
+    
+    // const char *contentEnd = requestBody - strlen(m_boundary); 
+    const char *contentEnd=strstr(contentStart, m_boundary)-4;//去除两个横杆和一个换行符组合
+    // 构建完整的文件保存路径  
+    size_t pathLength = strlen(file_save_path) + strlen(filename) + 2; // +2 为了斜杠和空字符  
+    char *filePath = (char *)malloc(pathLength);
+
+    
+    if (!filePath) {  
+        free((void *)filename); // 不要忘记释放之前分配的内存！  
+        fprintf(stderr, "Failed to allocate memory for file path.\n");  
+        return;  
+    }  
+    snprintf(filePath, pathLength, "%s/%s", file_save_path, filename); // 创建完整的文件路径  
+    free((void *)filename); // 不再需要文件名，释放内存。  
+    LOG_INFO("-----------------filePath:%s", filePath);
+    // 保存文件内容到指定路径的文件中。注意：这里的 contentStart 和 contentEnd 只是示例，并不真实。  
+    saveFileContent(filePath, contentStart, contentEnd); // 这将不会按预期工作，因为 contentStart 和 contentEnd 是硬编码的。  
+    free(filePath); // 不再需要文件路径，释放内存。  
+}  
+
+
+
+
+  
 //判断http请求是否被完整读入
 http_conn::HTTP_CODE http_conn::parse_content(char *text)
 {
     if (m_read_idx >= (m_content_length + m_checked_idx))
     {
-        text[m_content_length] = '\0';
-        //POST请求中最后为输入的用户名和密码
-        m_string = text;
+        if(m_content_type){
+            LOG_INFO("-----------------解析上传文件\r\n");
+            LOG_INFO("%s", text);
+            LOG_INFO("-----------------解析上传文件\r\n");
+            update_file_save(text);
+        }else{
+            text[m_content_length] = '\0';
+            //POST请求中最后为输入的用户名和密码
+            m_string = text;
+            LOG_INFO("-----------------解析用户账户密码登录信息\r\n");
+        }
+
         return GET_REQUEST;
     }
     return NO_REQUEST;
 }
+
+
+
+
 
 http_conn::HTTP_CODE http_conn::process_read()
 {
@@ -384,7 +495,55 @@ http_conn::HTTP_CODE http_conn::process_read()
     }
     return NO_REQUEST;
 }
+void http_conn::file_response_to_json(string dir_name){
+        DIR* dir;  
+        struct dirent* ent;  
+        struct stat file_stat;  
+        std::vector<std::pair<std::string, std::string>> files_info;  
+  
+        if ((dir = opendir(dir_name.c_str())) != NULL) {  
+            while ((ent = readdir(dir)) != NULL) {  
+                if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {  
+                    continue;  
+                }  
+  
+                std::string full_path = dir_name + "/" + std::string(ent->d_name);
+                LOG_INFO("full_path:   %s",full_path.c_str());
+                if (stat(full_path.c_str(), &file_stat) == 0) {  
+                    std::string file_name = ent->d_name;  
+                    std::string last_modified_time = ctime(&file_stat.st_mtime);  
+                    last_modified_time.pop_back();
+                    files_info.push_back(std::make_pair(file_name, last_modified_time)); 
+                    LOG_INFO("%s,%s",file_name.c_str(),last_modified_time.c_str()); 
+                }  
+            }  
+            closedir(dir);  
+        } else {  
+            // 无法打开目录  
+            LOG_INFO("--------------------------------------------无法打开目录");
+            return ;
+        }  
 
+
+                // 构建JSON响应  
+        Json::Value root;  
+        for (const auto& file_info : files_info) {  
+            Json::Value file_data;  
+            file_data["name"] = file_info.first;  
+            file_data["lastModified"] = file_info.second;  
+            root.append(file_data);  
+        }  
+  
+        Json::StreamWriterBuilder writer;  
+        //m_json_response = Json::writeString(writer, root).c_str(); 
+        json_temporary_response = Json::writeString(writer, root); 
+        LOG_INFO("--------------------------------------------json构建完成");
+        //LOG_INFO("%s",json_response.c_str());
+        m_json_response=json_temporary_response.c_str();
+        LOG_INFO("%s",m_json_response);
+        LOG_INFO("--------------------------------------------json构建完成");
+        return ; 
+}
 http_conn::HTTP_CODE http_conn::do_request()
 {
     strcpy(m_real_file, doc_root);
@@ -450,7 +609,7 @@ http_conn::HTTP_CODE http_conn::do_request()
         else if (*(p + 1) == '2')
         {
             if (users.find(name) != users.end() && users[name] == password)
-                strcpy(m_url, "/welcome.html");
+                strcpy(m_url, "/file_management.html");
             else
                 strcpy(m_url, "/logError.html");
         }
@@ -491,10 +650,24 @@ http_conn::HTTP_CODE http_conn::do_request()
     else if (*(p + 1) == '7')
     {
         char *m_url_real = (char *)malloc(sizeof(char) * 200);
-        strcpy(m_url_real, "/fans.html");
+        strcpy(m_url_real, "/update_ready.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
 
         free(m_url_real);
+    }else if (strncasecmp(p, "/Update_File", 12)==0){
+        LOG_INFO("--------------------------------------------接收到了访问文件夹请求");
+        // char *m_url_real = (char *)malloc(sizeof(char) * 200);
+        // strcpy(m_url_real, "/video.html");
+        // strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
+
+        // free(m_url_real);
+        file_response_to_json("./Update_File");
+        //LOG_INFO("--------------------------------------------m_json_response");
+        //LOG_INFO("%s",m_json_response);
+        if(m_json_response){
+            return FILE_REQUEST;
+        }
+        
     }
     else
         strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
@@ -593,7 +766,7 @@ bool http_conn::add_response(const char *format, ...)
     m_write_idx += len;
     va_end(arg_list);
 
-    LOG_INFO("request:%s", m_write_buf);
+    LOG_INFO("request:\n%s", m_write_buf);
 
     return true;
 }
@@ -614,6 +787,12 @@ bool http_conn::add_content_type()
 {
     return add_response("Content-Type:%s\r\n", "text/html");
 }
+
+bool http_conn::add_content_type_json()
+{
+    return add_response("Content-Type:%s\r\n", "application/json");
+}
+
 bool http_conn::add_linger()
 {
     return add_response("Connection:%s\r\n", (m_linger == true) ? "keep-alive" : "close");
@@ -656,9 +835,12 @@ bool http_conn::process_write(HTTP_CODE ret)
     }
     case FILE_REQUEST:
     {
+        LOG_INFO("进入了200报文构造");
         add_status_line(200, ok_200_title);
-        if (m_file_stat.st_size != 0)
+        if (!m_json_response&&m_file_stat.st_size != 0)
+        //if (m_file_stat.st_size != 0)
         {
+            //LOG_INFO("---------------------你猜错了----------------");
             add_headers(m_file_stat.st_size);
             m_iv[0].iov_base = m_write_buf;
             m_iv[0].iov_len = m_write_idx;
@@ -670,10 +852,33 @@ bool http_conn::process_write(HTTP_CODE ret)
         }
         else
         {
-            const char *ok_string = "<html><body></body></html>";
-            add_headers(strlen(ok_string));
-            if (!add_content(ok_string))
-                return false;
+            LOG_INFO("---------------------你没猜错----------------");
+            if(m_json_response){
+                    add_content_type_json();
+                    //LOG_INFO("strlen(m_json_response):%d",strlen(m_json_response));
+                     add_headers(strlen(m_json_response));
+                    //LOG_INFO("%s",m_json_response);
+                    m_iv[0].iov_base = m_write_buf;
+                    m_iv[0].iov_len = m_write_idx;
+                    m_iv[1].iov_base = const_cast<char*>(m_json_response);
+                    m_iv[1].iov_len = strlen(m_json_response);
+                    m_iv_count = 2;
+                    bytes_to_send = m_write_idx + strlen(m_json_response);
+            }else{
+                char *ok_string = "<html><body>你是傻逼傻逼大傻逼大大大大大傻逼</body></html>";
+                add_headers(strlen(ok_string));
+                m_iv[0].iov_base = m_write_buf;
+                m_iv[0].iov_len = m_write_idx;
+                m_iv[1].iov_base = ok_string;
+                m_iv[1].iov_len = strlen(ok_string);
+                m_iv_count = 2;
+                bytes_to_send = m_write_idx + strlen(ok_string);
+            }
+
+
+
+            return true;
+
         }
     }
     default:

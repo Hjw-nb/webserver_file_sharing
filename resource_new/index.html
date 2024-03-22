@@ -1,0 +1,71 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>周报管理系统-何建文</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+    <div class="box">
+        <h2>Login</h2>
+        <div class="input-box">
+            <label for="account">账号: </label>
+            <input type="text" name="account" id="account">
+        </div>
+        <div class="input-box">
+            <label for="password">密码: </label>
+            <input type="password" name="password" id="password">
+        </div>
+        <div class="btn-box">
+            <a href="https://www.baidu.com">忘记密码?</a>
+            <div>
+                <button>登录</button>
+                <button>注册</button>
+            </div>
+
+        </div>
+
+    </div>
+
+
+<body>
+
+</body>
+</html> -->
+
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>登录与注册</title>  
+    <link rel="stylesheet" href="css/style-index.css">
+    <script>  
+        function submitForm(formId, actionUrl) {  
+            var form = document.getElementById(formId);  
+            form.action = actionUrl; // 设置表单提交的URL  
+            form.submit(); // 提交表单  
+        }  
+    </script>  
+</head>  
+<body>  
+    <div class="box">  
+        <h2>登录与注册</h2>  
+        <form id="user-form" method="post">  
+            <div class="input-box">  
+                <label for="user-account">账号:</label>  
+                <input type="text" name="user" id="user-account" placeholder="用户名" required>  
+            </div>  
+            <div class="input-box">  
+                <label for="user-password">密码:</label>  
+                <input type="password" name="password" id="user-password" placeholder="密码" required>  
+            </div>  
+            <div class="btn-box">  
+                <a href="https://www.baidu.com">忘记密码?</a>
+                <div>
+                    <button type="button" onclick="submitForm('user-form', '2CGISQL.cgi')">登录</button>  
+                    <button type="button" onclick="submitForm('user-form', '3CGISQL.cgi')">注册</button>  
+                <div>
+            </div>  
+        </form>  
+    </div>  
+</body>  
+</html>

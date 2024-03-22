@@ -20,7 +20,13 @@
 #include <sys/wait.h>
 #include <sys/uio.h>
 #include <map>
-
+#include <cstring>  
+#include <cstdio>  
+#include <cstdlib>  
+#include <dirent.h>  
+#include <vector>  
+#include "../jsoncpp/include/json/json.h" // 需要安装jsoncpp库来处理JSON  
+  
 #include "../lock/locker.h"
 #include "../CGImysql/sql_connection_pool.h"
 #include "../timer/lst_timer.h"
@@ -29,9 +35,12 @@
 class http_conn
 {
 public:
-    static const int FILENAME_LEN = 200;
-    static const int READ_BUFFER_SIZE = 2048;
-    static const int WRITE_BUFFER_SIZE = 1024;
+    static const int FILENAME_LEN = 200;  //设置读取文件的名称m_real_file大小
+    static const int READ_BUFFER_SIZE = 2048;  //设置读缓冲区m_read_buf大小
+    static const int WRITE_BUFFER_SIZE = 1024;  //设置写缓冲区m_write_buf大小
+
+
+    //报文的请求方法，本项目只用到GET和POST
     enum METHOD
     {
         GET = 0,
@@ -44,28 +53,37 @@ public:
         CONNECT,
         PATH
     };
+
+
+    //主状态机的状态
     enum CHECK_STATE
     {
-        CHECK_STATE_REQUESTLINE = 0,
-        CHECK_STATE_HEADER,
-        CHECK_STATE_CONTENT
+        CHECK_STATE_REQUESTLINE = 0, //当前正在分析请求行
+        CHECK_STATE_HEADER,          //当前正在分析头部字段
+        CHECK_STATE_CONTENT          //当前正在解析请求体
     };
+
+
+     //报文解析的结果
     enum HTTP_CODE
     {
-        NO_REQUEST,
-        GET_REQUEST,
-        BAD_REQUEST,
-        NO_RESOURCE,
-        FORBIDDEN_REQUEST,
-        FILE_REQUEST,
-        INTERNAL_ERROR,
-        CLOSED_CONNECTION
+        NO_REQUEST,                  //请求不完整，需要继续读取客户数据
+        GET_REQUEST,                 //表示获得了一个完成的客户请求
+        BAD_REQUEST,                 //表示客户请求语法错误
+        NO_RESOURCE,                 //表示服务器没有资源
+        FORBIDDEN_REQUEST,           //表示客户对资源没有足够的访问权限
+        FILE_REQUEST,                //文件请求,获取文件成功
+        INTERNAL_ERROR,              //表示服务器内部错误
+        CLOSED_CONNECTION            //表示客户端已经关闭连接了
     };
+
+
+    //从状态机的状态
     enum LINE_STATUS
     {
-        LINE_OK = 0,
-        LINE_BAD,
-        LINE_OPEN
+        LINE_OK = 0,                 //读取到一个完整的行
+        LINE_BAD,                    //行出错
+        LINE_OPEN                    //行数据尚且不完整
     };
 
 public:
@@ -76,12 +94,15 @@ public:
     void init(int sockfd, const sockaddr_in &addr, char *, int, int, string user, string passwd, string sqlname);
     void close_conn(bool real_close = true);
     void process();
-    bool read_once();
-    bool write();
+    bool read_once();//读取浏览器端发来的全部数据
+    bool write();//响应报文写入函数
     sockaddr_in *get_address()
     {
         return &m_address;
     }
+
+
+    //同步线程初始化数据库读取表
     void initmysql_result(connection_pool *connPool);
     int timer_flag;
     int improv;
@@ -103,10 +124,14 @@ private:
     bool add_status_line(int status, const char *title);
     bool add_headers(int content_length);
     bool add_content_type();
+    bool add_content_type_json();
     bool add_content_length(int content_length);
     bool add_linger();
     bool add_blank_line();
-
+    void update_file_save(const char *requestBody);
+    void saveFileContent(const char *filePath, const char *contentStart, const char *contentEnd);
+    const char* findFilename(const char *requestBody);
+    void file_response_to_json(string dir_name);
 public:
     static int m_epollfd;
     static int m_user_count;
@@ -117,7 +142,7 @@ private:
     int m_sockfd;
     sockaddr_in m_address;
     char m_read_buf[READ_BUFFER_SIZE];
-    long m_read_idx;
+    long m_read_idx; //缓冲区中m_read_buf中数据的最后一个字节的下一个位置
     long m_checked_idx;
     int m_start_line;
     char m_write_buf[WRITE_BUFFER_SIZE];
@@ -129,6 +154,8 @@ private:
     char *m_version;
     char *m_host;
     long m_content_length;
+    char *m_content_type;
+    char *m_boundary;
     bool m_linger;
     char *m_file_address;
     struct stat m_file_stat;
@@ -136,6 +163,8 @@ private:
     int m_iv_count;
     int cgi;        //是否启用的POST
     char *m_string; //存储请求头数据
+    string json_temporary_response;
+    const char *m_json_response; //用来存储要传输的jsonshuju 
     int bytes_to_send;
     int bytes_have_send;
     char *doc_root;
