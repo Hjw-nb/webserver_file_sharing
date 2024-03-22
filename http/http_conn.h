@@ -36,8 +36,8 @@ class http_conn
 {
 public:
     static const int FILENAME_LEN = 200;  //设置读取文件的名称m_real_file大小
-    static const int READ_BUFFER_SIZE = 2048;  //设置读缓冲区m_read_buf大小
-    static const int WRITE_BUFFER_SIZE = 1024;  //设置写缓冲区m_write_buf大小
+    static const int READ_BUFFER_SIZE = 65535;  //设置读缓冲区m_read_buf大小
+    static const int WRITE_BUFFER_SIZE = 65535;  //设置写缓冲区m_write_buf大小
 
 
     //报文的请求方法，本项目只用到GET和POST
@@ -132,6 +132,7 @@ private:
     void saveFileContent(const char *filePath, const char *contentStart, const char *contentEnd);
     const char* findFilename(const char *requestBody);
     void file_response_to_json(string dir_name);
+    void saveFile(const char *filename, const char *data, size_t length);
 public:
     static int m_epollfd;
     static int m_user_count;

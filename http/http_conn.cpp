@@ -168,6 +168,28 @@ void http_conn::init()
 //返回值为行的读取状态，有LINE_OK,LINE_BAD,LINE_OPEN
 http_conn::LINE_STATUS http_conn::parse_line()
 {
+        // 增加一个状态，用于处理请求体
+    // if (m_state == CHECK_STATE_CONTENT) {
+    //     LOG_INFO("m_state == CHECK_STATE_CONTENT\r\n");
+    //     // 直接根据Content-Length读取请求体，不再逐字节解析
+    //     if (m_read_idx > m_content_length + m_checked_idx) {
+    //         // 请求体已完全读取
+    //         m_string = m_read_buf + m_checked_idx; // 假设m_string用于存储请求体数据
+    //         m_checked_idx += m_content_length; // 更新已检查的索引
+    //         return LINE_OK; // 表示请求体已完整读取
+    //     } else {
+    //         return LINE_OPEN; // 请求体尚未完全读取
+    //     }
+    // }
+
+    // if (m_state == CHECK_STATE_CONTENT&&m_content_length>0) {
+    //     LOG_INFO("m_state == CHECK_STATE_CONTENT\r\n");
+    //     // 直接根据Content-Length读取请求体，不再逐字节解析
+    //     if (m_read_idx < m_content_length + m_checked_idx-5) {
+    //         return LINE_OPEN; // 请求体尚未完全读取
+    //     } 
+    // }
+
     char temp;
     for (; m_checked_idx < m_read_idx; ++m_checked_idx)
     {
@@ -279,6 +301,7 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
     if (strncasecmp(m_url, "https://", 8) == 0)
     {
         m_url += 8;
+        // m_url += 0;
         m_url = strchr(m_url, '/');
     }
 
@@ -333,14 +356,14 @@ http_conn::HTTP_CODE http_conn::parse_headers(char *text)
             *end='\0';
             m_content_type=text;
             // *end=';';
-            LOG_INFO("-----------------m_content_type:%s", m_content_type);
+            LOG_INFO("m_content_type:%s", m_content_type);
 
             text=end+1;
             text += strspn(text, " \t");
             if(strncasecmp(text, "boundary=", 9) == 0){
                 text+=9;
                 m_boundary=text;
-                LOG_INFO("-----------------boundary:%s", m_boundary);
+                LOG_INFO("m_boundary:%s", m_boundary);
 
             }
         }
@@ -385,64 +408,117 @@ void http_conn::saveFileContent(const char *filePath, const char *contentStart, 
     LOG_INFO("-----------------------------File saved successfully to %s\n", filePath);  
 }  
   
-// 处理上传的文件内容的函数  
-void http_conn::update_file_save(const char *requestBody) {  
-    const char *filename = findFilename(requestBody); // 提取文件名  
-    if (!filename) {  
-        LOG_INFO("Failed to find filename in the request body.\n");  
-        return;  
-    }  
+//处理上传的文件内容的函数  
+// void http_conn::update_file_save(const char *requestBody) {  
+//     const char *filename = findFilename(requestBody); // 提取文件名  
+//     if (!filename) {  
+//         LOG_INFO("Failed to find filename in the request body.\n");  
+//         return;  
+//     }  
 
-    // requestBody += strspn(requestBody, "Content-Type: text/plain");
-    const char *contentStart= strstr(requestBody, "\r\n\r\n")+4;//去除两个换行符组合
-    LOG_INFO("-----------------contentStart:%s", contentStart);
+//     // requestBody += strspn(requestBody, "Content-Type: text/plain");
+
+
+
+//     const char *contentStart= strstr(requestBody, "\r\n\r\n")+4;//去除两个换行符组合
+//     LOG_INFO("-----------------contentStart:%s", contentStart);
   
-    // const char *contentStart = requestBody;  
+//     // const char *contentStart = requestBody;  
 
     
-    // const char *contentEnd = requestBody - strlen(m_boundary); 
-    const char *contentEnd=strstr(contentStart, m_boundary)-4;//去除两个横杆和一个换行符组合
-    // 构建完整的文件保存路径  
-    size_t pathLength = strlen(file_save_path) + strlen(filename) + 2; // +2 为了斜杠和空字符  
-    char *filePath = (char *)malloc(pathLength);
+//     // const char *contentEnd = requestBody - strlen(m_boundary); 
+//     const char *contentEnd=strstr(contentStart, m_boundary)-4;//去除两个横杆和一个换行符组合
+//     // 构建完整的文件保存路径  
+//     size_t pathLength = strlen(file_save_path) + strlen(filename) + 2; // +2 为了斜杠和空字符  
+//     char *filePath = (char *)malloc(pathLength);
 
     
-    if (!filePath) {  
-        free((void *)filename); // 不要忘记释放之前分配的内存！  
-        fprintf(stderr, "Failed to allocate memory for file path.\n");  
-        return;  
-    }  
-    snprintf(filePath, pathLength, "%s/%s", file_save_path, filename); // 创建完整的文件路径  
-    free((void *)filename); // 不再需要文件名，释放内存。  
-    LOG_INFO("-----------------filePath:%s", filePath);
-    // 保存文件内容到指定路径的文件中。注意：这里的 contentStart 和 contentEnd 只是示例，并不真实。  
-    saveFileContent(filePath, contentStart, contentEnd); // 这将不会按预期工作，因为 contentStart 和 contentEnd 是硬编码的。  
-    free(filePath); // 不再需要文件路径，释放内存。  
-}  
+//     if (!filePath) {  
+//         free((void *)filename); // 不要忘记释放之前分配的内存！  
+//         fprintf(stderr, "Failed to allocate memory for file path.\n");  
+//         return;  
+//     }  
+//     snprintf(filePath, pathLength, "%s/%s", file_save_path, filename); // 创建完整的文件路径  
+//     free((void *)filename); // 不再需要文件名，释放内存。  
+//     LOG_INFO("-----------------filePath:%s", filePath);
+//     // 保存文件内容到指定路径的文件中。注意：这里的 contentStart 和 contentEnd 只是示例，并不真实。  
+//     saveFileContent(filePath, contentStart, contentEnd); // 这将不会按预期工作，因为 contentStart 和 contentEnd 是硬编码的。  
+//     free(filePath); // 不再需要文件路径，释放内存。  
+// }  
+//处理上传的文件内容的函数
+void http_conn::update_file_save(const char *requestBody) {
+    const char *filename = findFilename(requestBody);
+    if (!filename) {
+        LOG_INFO("Failed to find filename in the request body.\n");
+        return;
+    }
+
+    const char *contentStart = strstr(requestBody, "\r\n\r\n") + 4;
+    if (!contentStart) {
+        LOG_INFO("Failed to locate the start of file content.\n");
+        free((void *)filename);
+        return;
+    }
+
+    // 构建结束边界标记，通常是 "--boundary--"
+    std::string endBoundary = "\r\n--";
+    endBoundary += m_boundary;
+    endBoundary += "--";
+    
+    const char *contentEnd = strstr(contentStart, endBoundary.c_str());
+    if (!contentEnd) {
+        // 如果没有找到结束边界，直接根据Content-Length来定位结束位置
+        LOG_INFO("End boundary not found, using Content-Length to locate the end of file content.\n");
+        // 这里假设你有办法获取请求体的总长度m_content_length
+        size_t headerLength = contentStart - requestBody; // 请求头长度
+        contentEnd = requestBody + m_content_length - (strlen(m_boundary) + 6); // 减去边界和额外字符的长度
+    } else {
+        contentEnd -= 2; // 对于结束边界，回退到边界前的\r\n处
+    }
+
+    // 计算文件内容长度并校验
+    size_t contentLength = contentEnd - contentStart;
+    if (contentLength <= 0) {
+        LOG_INFO("Invalid file content length.\n");
+        free((void *)filename);
+        return;
+    }
+
+    // 构建文件保存路径
+    char filePath[FILENAME_LEN] = {0};
+    snprintf(filePath, FILENAME_LEN, "%s/%s", file_save_path, filename);
+    free((void *)filename);
+
+    // 保存文件内容到指定路径
+    saveFileContent(filePath, contentStart, contentEnd);
+}
 
 
 
 
-  
+
 //判断http请求是否被完整读入
 http_conn::HTTP_CODE http_conn::parse_content(char *text)
 {
     if (m_read_idx >= (m_content_length + m_checked_idx))
     {
+        //if(strncasecmp(m_content_type, "multipart/form-data", 19) == 0)
         if(m_content_type){
             LOG_INFO("-----------------解析上传文件\r\n");
             LOG_INFO("%s", text);
-            LOG_INFO("-----------------解析上传文件\r\n");
+            // LOG_INFO("-----------------解析上传文件\r\n");
             update_file_save(text);
+            // return FILE_REQUEST;
         }else{
             text[m_content_length] = '\0';
             //POST请求中最后为输入的用户名和密码
             m_string = text;
-            LOG_INFO("-----------------解析用户账户密码登录信息\r\n");
+            //LOG_INFO("-----------------解析用户账户密码登录信息\r\n");
         }
-
+        LOG_INFO("-----------------请求被完整读入了\r\n");
         return GET_REQUEST;
     }
+    LOG_INFO("-----------------请求没有被完全读入\r\n");
     return NO_REQUEST;
 }
 
@@ -460,7 +536,20 @@ http_conn::HTTP_CODE http_conn::process_read()
     {
         text = get_line();
         m_start_line = m_checked_idx;
-        LOG_INFO("%s", text);
+        //LOG_INFO("主状态机数据读取：%s", text);
+        if(m_check_state == CHECK_STATE_CONTENT && line_status == LINE_OK){
+            // 循环打印每个字节的数据
+            for (int i = 0; i < m_content_length; ++i) {
+                // 打印当前字节，使用%02x来以十六进制形式打印，并且保证打印两位数（如果需要的话，前面补零）
+                printf("%02x ", (unsigned char)text[i]);
+
+                // 每16个字节换一行，以便查看
+                if ((i + 1) % 16 == 0) {
+                    printf("\n");
+                }
+            }
+            printf("\n"); // 最后再换行，以便隔开后续的输出
+        }
         switch (m_check_state)
         {
         case CHECK_STATE_REQUESTLINE:
@@ -668,6 +757,8 @@ http_conn::HTTP_CODE http_conn::do_request()
             return FILE_REQUEST;
         }
         
+    }else if (strncasecmp(p, "/upload", 12)==0){
+        return FILE_REQUEST;
     }
     else
         strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
@@ -697,7 +788,7 @@ void http_conn::unmap()
 bool http_conn::write()
 {
     int temp = 0;
-
+    LOG_INFO("--------------------------------现在的m_linger状态是：%d\r\n",m_linger);
     if (bytes_to_send == 0)
     {
         modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
@@ -742,6 +833,7 @@ bool http_conn::write()
             if (m_linger)
             {
                 init();
+                LOG_INFO("--------------------------------接收到了keep-alive要求，保持连接\r\n");
                 return true;
             }
             else
@@ -766,7 +858,7 @@ bool http_conn::add_response(const char *format, ...)
     m_write_idx += len;
     va_end(arg_list);
 
-    LOG_INFO("request:\n%s", m_write_buf);
+    LOG_INFO("response:\n%s", m_write_buf);
 
     return true;
 }
@@ -840,7 +932,7 @@ bool http_conn::process_write(HTTP_CODE ret)
         if (!m_json_response&&m_file_stat.st_size != 0)
         //if (m_file_stat.st_size != 0)
         {
-            //LOG_INFO("---------------------你猜错了----------------");
+            LOG_INFO("---------------------你猜错了----------------");
             add_headers(m_file_stat.st_size);
             m_iv[0].iov_base = m_write_buf;
             m_iv[0].iov_len = m_write_idx;
@@ -865,7 +957,7 @@ bool http_conn::process_write(HTTP_CODE ret)
                     m_iv_count = 2;
                     bytes_to_send = m_write_idx + strlen(m_json_response);
             }else{
-                char *ok_string = "<html><body>你是傻逼傻逼大傻逼大大大大大傻逼</body></html>";
+                char *ok_string = "<html><body>hello everyone</body></html>";
                 add_headers(strlen(ok_string));
                 m_iv[0].iov_base = m_write_buf;
                 m_iv[0].iov_len = m_write_idx;

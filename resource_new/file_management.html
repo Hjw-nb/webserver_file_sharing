@@ -64,7 +64,35 @@
               console.error('Error fetching file information:', error);    
           });    
   }  
-  </script>
+
+  function uploadFile() {
+    // 这里编写上传文件的逻辑，可以通过 fetch 或者其他适合的方式来发送文件给服务器
+    const formData = new FormData();
+    const fileInput = document.getElementById('fileToUpload');
+    formData.append('file', fileInput.files[0]);
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to upload file');
+        }
+        // 上传成功后刷新文件列表
+        loadFiles();
+        // 关闭上传模态框
+        $('#myModal2').modal('hide');
+    })
+    .catch(error => {
+        console.error('Error uploading file:', error);
+    });
+  }
+
+  function downloadAllFiles() {
+      // 这里编写全部下载文件的逻辑，可以通过 fetch 或者其他适合的方式从服务器下载所有文件
+  }
+</script>
 
 
 <title>后台文件管理</title>
@@ -101,27 +129,38 @@
   }
   </style>
 </head>
-<body class="sticky-header" onload="loadFiles()">
-<!-- <section>
 
-<br/>
-<div align="center"><video width="906" height="506" controls>
-<source src="xxx.mp4" type="video/mp4">
 
-</video></div> -->
+<body class="sticky-header">
   <div class="sidebar-left">
     <div class="sidebar-left-info">
       <div class=" search-field"> </div>
       <ul class="nav nav-pills nav-stacked side-navigation">
         <!-- <li class="menu-list nav-active"> <a href=""><i class="fa fa-drivers-license"></i> <span>周报管理</span></a> -->
           <li class="menu-list nav-active"> <a href=""><svg class="icon" aria-hidden="true">
-            <use xlink:href="#icon-mingpian"></use>
-          </svg><span class="aaa"></span><span>周报管理</span><span class="bbb"><svg class="icon" aria-hidden="true">
-            <use xlink:href="#icon-xiala"></use>
-          </svg></span></a>
-          <ul class="child-list">
-            <li class="active"><a href="file_management.html">周报文件</a></li>
+              <use xlink:href="#icon-mingpian"></use>
+            </svg><span class="aaa"></span><span>周报管理</span><span class="bbb"><svg class="icon" aria-hidden="true">
+              <use xlink:href="#icon-xiala"></use>
+            </svg></span></a>
+            <ul class="child-list">
+              <li class="active"><a href="file_management.html">周报文件</a></li>
           </ul>
+
+
+          <li class="menu-list nav-active"> <a href=""><svg class="icon" aria-hidden="true">
+              <use xlink:href="#icon-mingpian"></use>
+            </svg><span class="aaa"></span><span>文件共享</span><span class="bbb"><svg class="icon" aria-hidden="true">
+              <use xlink:href="#icon-xiala"></use>
+            </svg></span></a>
+            <ul class="child-list">
+              <li class="active"><a href="video.html">视频文件</a></li>
+              <li class="active"><a href="picture.html">图片文件</a></li>
+          </ul>
+
+
+
+
+
       </ul>
     </div>
   </div>
@@ -157,33 +196,10 @@
       </ol>
       <h3>周报文件</h3>
     </div>
-    <!-- <div class="wrapper">
-      <div class="panel">
-        <div class="panel-body">
-				<a href="#" class="btn btn-primary" data-toggle="modal" data-target="#myModal2">上传文件</a>
-				<a href="#" class="btn btn-primary" data-toggle="modal" data-target="#myModal3">全部下载</a>
-			  </div>
-            <div class="pull-right"></div>
-          </div>
-          <table class="table m-t-20">
-            <thead>
-              <tr>
-                <th>文件名</th>
-                <th>文件修改时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>-2024-3-15.txt</td>
-                <td>2024年3月14号8:00</td>
-                              <td><a href="#"  data-toggle="modal" data-target="#myModal">下载</a> <a href="#">删除</a></td>
-              </tr>              
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div> -->
-    <div class="wrapper">  
+
+
+
+<div class="wrapper">  
       <div class="panel">  
           <div class="panel-body">  
               <a href="#" class="btn btn-primary" data-toggle="modal" data-target="#myModal2">上传文件</a>  
@@ -200,7 +216,7 @@
           </thead>  
           <tbody id="fileTableBody"></tbody> <!-- 给tbody一个ID以便更容易地选择它 -->  
       </table>  
-  </div>  
+</div>  
   <script>  
   // 页面加载完成后调用 loadFiles 函数  
   window.onload = loadFiles;  
@@ -211,72 +227,41 @@
 
 
 <!-- Modal -->
-	
-	
-<div class="modal fade" id="myModal2" tabfile_show="-1" role="dialog" aria-labelledby="myModalLabel2">
-  <div class="modal-dialog" role="document" style="width: 500px;">
+<!-- 模态框 -->
+<div id="myModal2" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <!-- 模态框内容 -->
     <div class="modal-content">
       <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel2">新增ID卡</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">上传文件</h4>
       </div>
       <div class="modal-body">
-    <div class="form1">
-            <ul class="row">
-              <li class="col-xs-12"> <span>卡号：</span>
-                <input type="text" class="form-control">
-              </li>
-			
-				
-              <li class="col-xs-12"> <span>卡状态：</span>
-                <select class="form-control">
-                  <option>未绑定</option>
-                  <option>使用中</option>
-                  <option>补卡</option>
-                </select>
-              </li>
-            </ul>
-          </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="button" class="btn btn-primary">新增</button>
+        <form id="uploadForm" enctype="multipart/form-data">
+          <input type="file" name="fileToUpload" id="fileToUpload">
+          <input type="button" value="上传" onclick="uploadFile()">
+        </form>
       </div>
     </div>
   </div>
 </div>
-	
-	
-	<div class="modal fade" id="myModal3" tabfile_show="-1" role="dialog" aria-labelledby="myModalLabel3">
-  <div class="modal-dialog" role="document" style="width: 500px;">
+
+<div id="myModal3" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <!-- 模态框内容 -->
     <div class="modal-content">
       <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel3">批量增加ID卡</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">全部下载</h4>
       </div>
       <div class="modal-body">
-    <div class="form1">
-            <ul class="row">
-              <li class="col-xs-12"> <span>系列：</span><input type="text" class="form-control"> </li>
-              <li class="col-xs-12"> <span>起始卡号：</span><input type="text" class="form-control"> </li>
-              <li class="col-xs-7"> <span>数量：</span><input type="text" class="form-control"> </li>
-              <li class="col-xs-7"> <span>卡状态：</span>
-                <select class="form-control">
-                  <option>未绑定</option>
-                  <option>使用中</option>
-                  <option>补卡</option>
-                </select>
-              </li>
-            </ul>
-          </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="button" class="btn btn-primary">新增</button>
+        <button onclick="downloadAllFiles()">下载全部文件</button>
       </div>
     </div>
   </div>
 </div>
+
+	
 	
 
 
