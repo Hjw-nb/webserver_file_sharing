@@ -133,6 +133,7 @@ private:
     const char* findFilename(const char *requestBody);
     void file_response_to_json(string dir_name);
     void saveFile(const char *filename, const char *data, size_t length);
+    void all_file_zip(const char *dir_name,const char *zip_name);
 public:
     static int m_epollfd;
     static int m_user_count;
@@ -169,7 +170,9 @@ private:
     int bytes_to_send;
     int bytes_have_send;
     char *doc_root;
+    bool download_flag;//当浏览器发出下载请求的时候，这个flag为真
 
+    
     map<string, string> m_users;
     int m_TRIGMode;
     int m_close_log;

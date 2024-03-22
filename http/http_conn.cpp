@@ -16,6 +16,8 @@ const char *error_500_form = "There was an unusual problem serving the request f
 
 
 const char *file_save_path="./Update_File";
+const char *output_zip_file = "./all_files.zip";
+const char *file_all_download_path="/Update_File/all_files.zip";
 locker m_lock;
 map<string, string> users;
 
@@ -158,6 +160,7 @@ void http_conn::init()
     timer_flag = 0;
     improv = 0;
     m_json_response=0;
+    download_flag=0;
     //json_response="0";
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
@@ -633,6 +636,35 @@ void http_conn::file_response_to_json(string dir_name){
         LOG_INFO("--------------------------------------------json构建完成");
         return ; 
 }
+void http_conn::all_file_zip(const char* dir_name,const char* zip_name){
+     // 构建完整的zip文件路径
+    std::string zipPath = std::string(dir_name) + "/" + zip_name;
+
+    std::string cmd = "rm -f ";
+    cmd += zipPath;  // 删除的zip文件的完整路径
+    int result = system(cmd.c_str());
+        if (result != 0) {
+        LOG_INFO("Failed to delete zip file.");
+        return ;
+    }
+
+     cmd = "zip -r ";
+    cmd += zipPath;  // 输出的zip文件的完整路径
+    cmd += " ";
+    cmd += dir_name; // 要打包的文件夹路径
+    cmd += " -x ";
+    cmd += zipPath; // 排除zip文件本身
+
+    // 执行命令
+    result = system(cmd.c_str());
+
+    if (result != 0) {
+        LOG_INFO("Failed to create zip file.");
+        return ;
+    }
+
+    return ;
+}
 http_conn::HTTP_CODE http_conn::do_request()
 {
     strcpy(m_real_file, doc_root);
@@ -757,24 +789,46 @@ http_conn::HTTP_CODE http_conn::do_request()
             return FILE_REQUEST;
         }
         
-    }else if (strncasecmp(p, "/upload", 12)==0){
+    }else if (strncasecmp(p, "/upload", 7)==0){
         return FILE_REQUEST;
+    }else if (strncasecmp(p, "/download_all_File", 18)==0){
+        all_file_zip(file_save_path,output_zip_file);
+        // char *m_url_real = (char *)malloc(sizeof(char) * 200);
+        // strcpy(m_url_real, file_all_download_path);
+        // strncpy(m_real_file + strlen(m_url_real), m_url_real, strlen(m_url_real));
+
+        // free(m_url_real);
+        download_flag=1;//发出了下载请求
+        char server_path[200];
+        getcwd(server_path, 200);
+        strcpy(m_real_file, server_path);
+        strcat(m_real_file, file_all_download_path);
+        LOG_INFO("----------------download_flag=1-------------:%s",m_real_file);
     }
     else
         strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
-
-    if (stat(m_real_file, &m_file_stat) < 0)
+    LOG_INFO("----------------m_real_file-------------:%s",m_real_file);
+    // LOG_INFO("----------------m_real_file_m_file_stat-------------:%s",stat(m_real_file, &m_file_stat));
+    if (stat(m_real_file, &m_file_stat) < 0){
+        LOG_INFO("----------------download_flag=1-------------:%d",NO_RESOURCE);
         return NO_RESOURCE;
-
-    if (!(m_file_stat.st_mode & S_IROTH))
-        return FORBIDDEN_REQUEST;
-
-    if (S_ISDIR(m_file_stat.st_mode))
+    }
+        
+    if (!(m_file_stat.st_mode & S_IROTH)){
+        LOG_INFO("----------------download_flag=1-------------:%d",FORBIDDEN_REQUEST);
+         return FORBIDDEN_REQUEST;
+    }
+       
+    if (S_ISDIR(m_file_stat.st_mode)){
+        LOG_INFO("----------------download_flag=1-------------:%d",BAD_REQUEST);
         return BAD_REQUEST;
+    }
+        
 
     int fd = open(m_real_file, O_RDONLY);
     m_file_address = (char *)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
+    LOG_INFO("----------------download_flag=1-------------:%d",FILE_REQUEST);
     return FILE_REQUEST;
 }
 void http_conn::unmap()
@@ -877,7 +931,13 @@ bool http_conn::add_content_length(int content_len)
 }
 bool http_conn::add_content_type()
 {
-    return add_response("Content-Type:%s\r\n", "text/html");
+    if(download_flag){
+        LOG_INFO("----------------download_flag触发添加头-------------");
+        return add_response("Content-Type:%s\r\nContent-Disposition: attachment; filename=\"all_files.zip\"\r\n", "application/octet-stream");
+    }else{
+        //return add_response("Content-Type:%s\r\n", "text/html");
+    }
+    // return add_response("Content-Type:%s\r\n", "text/html");
 }
 
 bool http_conn::add_content_type_json()
@@ -933,6 +993,7 @@ bool http_conn::process_write(HTTP_CODE ret)
         //if (m_file_stat.st_size != 0)
         {
             LOG_INFO("---------------------你猜错了----------------");
+            add_content_type();
             add_headers(m_file_stat.st_size);
             m_iv[0].iov_base = m_write_buf;
             m_iv[0].iov_len = m_write_idx;
